@@ -1,0 +1,31 @@
+import { normalizeAction, actionToArgs, normalizeCombo, comboRisk, KEYS, cleanComboName } from '../src/phone.js';
+let pass = 0, fail = 0;
+const t = (name, fn) => { try { fn(); pass++; } catch (e) { fail++; console.log('  ❌ ' + name + '\n     ' + e.message); } };
+const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error((m||'') + ' 期望 ' + JSON.stringify(b) + ' 实际 ' + JSON.stringify(a)); };
+const ok = (c, m) => { if (!c) throw new Error(m || '断言失败'); };
+
+t('tap 正常', () => { const r = normalizeAction({ kind: 'tap', x: 540, y: 960 }); ok(r.ok); eq(r.action, { kind:'tap', x:540, y:960 }); });
+t('★ 注入防护：x 传命令串被拒', () => { const r = normalizeAction({ kind: 'tap', x: '1; rm -rf /', y: 2 }); ok(!r.ok, '必须拒绝'); });
+t('★ 注入防护：x 传超范围被拒', () => { const r = normalizeAction({ kind: 'tap', x: 999999, y: 2 }); ok(!r.ok); });
+t('★ 注入防护：x 传 NaN 被拒', () => { ok(!normalizeAction({ kind:'tap', x:'abc', y:1 }).ok); });
+t('swipe 正常', () => { const r = normalizeAction({ kind:'swipe', x1:10,y1:20,x2:30,y2:40 }); ok(r.ok); ok(r.action.ms === 300); });
+t('longpress 变成原地 swipe', () => { const r = normalizeAction({ kind:'longpress', x:100, y:200, ms:900 }); ok(r.ok); eq([r.action.x1,r.action.y1,r.action.x2,r.action.y2],[100,200,100,200]); eq(r.action.ms, 900); });
+t('key 认已知键', () => { const r = normalizeAction({ kind:'key', key:'home' }); ok(r.ok); eq(r.action.code, KEYS.home); });
+t('key 认未知键被拒', () => { ok(!normalizeAction({ kind:'key', key:'rm-rf' }).ok); });
+t('text 正常 + 空格转义', () => { const r = normalizeAction({ kind:'text', text:'hello world' }); ok(r.ok); eq(actionToArgs(r.action), ['shell','input','text','hello%sworld']); });
+t('text 空被拒', () => { ok(!normalizeAction({ kind:'text', text:'   ' }).ok); });
+t('text 超长被拒', () => { ok(!normalizeAction({ kind:'text', text:'x'.repeat(600) }).ok); });
+t('不认的 kind 被拒', () => { ok(!normalizeAction({ kind:'rm-rf' }).ok); });
+t('shot 不需要参数', () => { const r = normalizeAction({ kind:'shot' }); ok(r.ok); eq(actionToArgs(r.action), ['exec-out','screencap','-p']); });
+t('连招正常', () => { const r = normalizeCombo([{kind:'tap',x:1,y:2},{kind:'wait',ms:500},{kind:'key',key:'back'}]); ok(r.ok, r.error); eq(r.steps.length, 3); });
+t('★ 连招里不许放截屏', () => { const r = normalizeCombo([{kind:'shot'}]); ok(!r.ok, '必须拒绝'); });
+t('连招有坏步骤就整体拒', () => { const r = normalizeCombo([{kind:'tap',x:1,y:2},{kind:'tap',x:'bad',y:2}]); ok(!r.ok); ok(/第 2 步/.test(r.error), r.error); });
+t('连招步数上限', () => { const many = Array.from({length: 61}, () => ({kind:'tap',x:1,y:2})); ok(!normalizeCombo(many).ok); });
+t('风险：有打字/有电源键就标 risky', () => {
+  eq(comboRisk([{kind:'tap'}]).risky, false);
+  eq(comboRisk([{kind:'text',text:'x'}]).risky, true);
+  eq(comboRisk([{kind:'key',key:'power'}]).risky, true);
+});
+t('连招名清洗', () => { eq(cleanComboName('  每日 签到/抖音  '), '每日-签到-抖音'); });
+console.log('\n  phone 逻辑：' + pass + ' 通过 / ' + fail + ' 失败');
+process.exit(fail === 0 ? 0 : 1);

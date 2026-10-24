@@ -1,0 +1,106 @@
+/**
+ * 她的歌单 + 翻唱（2026-10-14）。
+ *
+ * 管理员问「能让我说一首歌然后她唱出来吗」—— 诚实答案是**不能只凭歌名**：
+ * RVC 是**换嗓子**，必须先有一段人在唱；而"她自己上网找那首歌"这条路不通
+ * （她没有网络下载能力，热门歌也有版权，我们不去下别人的原曲）。
+ *
+ * 所以做成**歌单**：他发一次歌 → 进本地歌单 → 以后他说"唱 XX"，她直接唱出来发回。
+ * 第一次仍然要他给歌 —— 这是来源上的硬限制，不是技术问题。
+ *
+ * 纯逻辑放这里；真正跑模型（demucs + RVC）在 scripts/sing.py，由桥接调起。
+ */
+
+/** 歌存放在哪（跟着 state/sing 走，sing.py 也用它）。 */
+export const SONGS_DIR = 'state/sing/songs';
+
+/** 歌单清单文件。 */
+export const SONGS_INDEX = 'state/sing/songs.json';
+
+/** 一首歌最多留几个别名（他说"唱那首周杰伦的"也要能认出来）。 */
+export const SONG_MAX_ALIASES = 8;
+
+/** 歌名/别名最长多少字。 */
+export const SONG_NAME_MAX = 40;
+
+/** 给她的规矩。 */
+// 2026-10-20 压过半：删掉 list/add/sing 的用法（工具说明里都有），只留分寸 ——
+// "想唱就唱"、"先看歌词"、"唱完说自己的话"、"别全点"、"别转写自己那版"。
+export const SING_RULE = '【唱歌】你有歌单（`qq_sing`），里面是他给你的歌，用**你的嗓子**唱。\n'
+  + '- **想唱就唱**，唱完自动发他两样（完整版 + 副歌）。`sing` 是异步的，别反复点。\n'
+  + '- **歌单里没有就直说**"这首我没有，你发给我"—— 你不能凭歌名去网上找歌。\n'
+  + '- **唱之前先看歌词**（他发歌时我已转好文字给你）—— 知道在唱什么，不是盲点一首。\n'
+  + '- **唱完说一句你自己的话**（为什么挑这首、哪句没唱好），别只发"唱好了"。\n'
+  + '- 简单旋律没问题，大跳会飘 —— 可以自己说一句"可能有点跑"。一次一首，别全点；别转写自己那版。\n\n';
+
+/** 干净的歌名（当键用）。 */
+export function cleanSongName(name) {
+  return String(name ?? '')
+    .replace(/\.(mp3|m4a|aac|wav|flac|ogg|opus|amr|wma|m4b|aiff)$/i, '')
+    .replace(/[\\/:*?"<>|]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, SONG_NAME_MAX);
+}
+
+/** 能不能收进歌单。 */
+export function shouldAddSong(name, { count = 0, max = 100 } = {}) {
+  const clean = cleanSongName(name);
+  if (!clean) return { ok: false, reason: 'no-name', name: '', hint: '这首歌得有个名字（不然以后点不了）' };
+  if (count >= max) return { ok: false, reason: 'full', name: clean, hint: `歌单已经 ${count} 首了（上限 ${max}）` };
+  return { ok: true, reason: '', name: clean };
+}
+
+/** 歌单里查一首：先精确匹配 name，再匹配别名（大小写不敏感、去空白）。 */
+export function findSong(songs, query) {
+  const q = cleanSongName(query).toLowerCase();
+  if (!q) return null;
+  const list = Array.isArray(songs) ? songs : [];
+  const exact = list.find((s) => cleanSongName(s?.name).toLowerCase() === q);
+  if (exact) return exact;
+  const byAlias = list.find((s) => (s?.aliases ?? []).some((a) => cleanSongName(a).toLowerCase() === q));
+  if (byAlias) return byAlias;
+  // 退一步：包含匹配（他说"那首周杰伦的"）
+  return list.find((s) => cleanSongName(s?.name).toLowerCase().includes(q)) ?? null;
+}
+
+/** 加别名（去重、限长）。 */
+export function addAlias(song, alias) {
+  const a = cleanSongName(alias);
+  if (!a) return song;
+  const list = Array.isArray(song.aliases) ? song.aliases.slice() : [];
+  if (!list.some((x) => cleanSongName(x).toLowerCase() === a.toLowerCase())) list.push(a);
+  return { ...song, aliases: list.slice(-SONG_MAX_ALIASES) };
+}
+
+/** 歌单条目（写 json 用）。 */
+export function makeSongEntry({ name, file, addedAt = new Date().toISOString(), from = '' }) {
+  return {
+    name: cleanSongName(name),
+    file: String(file),
+    addedAt,
+    from: String(from).slice(0, 60),
+  };
+}
+
+/** 解析歌单（宽容）。 */
+export function parseSongs(text) {
+  try {
+    const o = JSON.parse(String(text ?? '') || '[]');
+    return Array.isArray(o) ? o.filter((x) => x && x.name && x.file) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 歌单展示行。 */
+export function formatSongLine(song, i) {
+  const aliases = (song?.aliases ?? []).filter(Boolean);
+  return `${i ? `${i}. ` : ''}${song?.name ?? '?'}${aliases.length ? `（也叫：${aliases.join('、')}）` : ''}`;
+}
+
+/** 翻唱产物的文件名（和 sing.py 的约定一致：state/sing/<name>.mp3|.flac）。纯逻辑，不碰 path。 */
+export function coverFileNames(name) {
+  const base = cleanSongName(name).replace(/\s+/g, '-') || 'cover';
+  return { base, mp3: `${base}.mp3`, flac: `${base}.flac`, wav: `${base}.wav` };
+}

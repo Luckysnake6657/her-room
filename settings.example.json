@@ -1,0 +1,44 @@
+{
+  "//": "settings.json 模板。首次启动向导会引导填写；也可以直接改这个文件再改名成 settings.json。",
+  "//note": "所有路径/QQ号/人格都属于使用者自己，不要带别人的。",
+
+  "bridgeDir": "",
+  "herDshDir": "",
+  "napcatDir": "",
+  "desktopDir": "",
+
+  "qq": "",
+  "qqNickname": "",
+  "personaName": "",
+  "personaCard": "",
+
+  "nodeExe": "D:\\Program Files\\nodejs\\node.exe",
+  "pythonExe": "C:\\Program Files\\Python312\\python.exe",
+  "dshBin": "C:\\Users\\%USERNAME%\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js",
+
+  "ports": {
+    "bridge": 3100,
+    "herDsh": 3081,
+    "speech": 3111,
+    "napcatWs": 3002,
+    "napcatHttp": 3003,
+    "napcatWeb": 6099
+  },
+
+  "napcat": {
+    "launcher": "napcat-hidden.bat",
+    "quickLogin": true
+  },
+
+  "tools": {
+    "adb": "",
+    "matlab": "",
+    "biliCookie": "",
+    "wmpvpToken": ""
+  },
+
+  "dsh": {
+    "model": "deepseek-flash",
+    "reasoningEffort": "high"
+  }
+}

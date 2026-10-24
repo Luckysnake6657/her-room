@@ -1,0 +1,307 @@
+{
+  "dsh": {
+    "baseUrl": "http://127.0.0.1:3080",
+    "provider": "deepseek-official",
+    "model": "deepseek-flash",
+    "reasoningEffort": "max",
+    "authToken": "",
+    "authHeader": "authorization",
+    "authPrefix": "Bearer"
+  },
+  "snowluma": {
+    "wsUrl": "ws://127.0.0.1:3001",
+    "httpUrl": "http://127.0.0.1:3000",
+    "accessToken": "",
+    "launcherPath": "",
+    "homeDir": "",
+    "allowProcessControl": false
+  },
+  "ownerQQ": null,
+  "sessionCwd": "",
+  "agentPreset": "qq-chat",
+  "workspaceTitle": "QQ 聊天",
+  "allow": {
+    "private": [],
+    "groups": []
+  },
+  "deny": {
+    "private": [],
+    "groups": []
+  },
+  "allowAllWhenEmpty": false,
+  "ackMessage": "",
+  "sendDelayMs": 300,
+  "questionTimeoutMs": 300000,
+  "consolePort": 3100,
+  "consoleToken": "",
+  "security": {
+    "interceptNotify": true
+  },
+  "slang": {
+    "enabled": true,
+    "extractMinMessages": 10,
+    "extractCooldownMs": 300000,
+    "inferenceThresholds": [
+      2,
+      4,
+      8
+    ],
+    "injectMax": 8,
+    "learnerPreset": "qq-chat",
+    "workspaceTitle": "QQ 黑话学习",
+    "autoResearch": true
+  },
+  "social": {
+    "enabled": true,
+    "maxReplyChars": 500,
+    "mustReplyKeywords": [
+      "deepseek",
+      "小鲸鱼",
+      "大肥鱼",
+      "鲸鱼",
+      "d指导",
+      "在吗"
+    ],
+    "contextWindow": 20,
+    "triggerProbability": 0.1,
+    "activeCheckMinMs": 8000,
+    "activeCheckMaxMs": 30000,
+    "idleWindowMs": 360000,
+    "idleRetryProbability": 0.4,
+    "proactiveEnabled": true,
+    "proactiveIdleThresholdMs": 1800000,
+    "proactiveCheckMinMs": 2700000,
+    "proactiveCheckMaxMs": 5400000,
+    "proactiveProbability": 0.2,
+    "activeReplyDelayMinMs": 1000,
+    "activeReplyDelayMaxMs": 5000,
+    "activeDurationEnabled": true,
+    "activeDurationMinMs": 1200000,
+    "activeDurationMaxMs": 3000000,
+    "skipProbability": 0.05,
+    "surrenderProbability": 0,
+    "idleRetryWaitMs": 120000,
+    "burstEnabled": true,
+    "burstIntervalMinMs": 1000,
+    "burstIntervalMaxMs": 3000,
+    "longGapProbability": 0.2,
+    "longGapMinMs": 5000,
+    "longGapMaxMs": 10000
+  },
+  "socialV2": {
+    "enabled": true,
+    "autoReplyCheckMs": 120000,
+    "agentPreset": "qq-chat-v2",
+    "provideRecommendations": true,
+    "tools": {
+      "getPrompt": true,
+      "getUnread": true,
+      "getRecent": true,
+      "socialState": true,
+      "sendGroup": true,
+      "sendPrivate": true,
+      "reply": true,
+      "sendBurst": true,
+      "sendMessage": true,
+      "waitMessages": true,
+      "feedback": true,
+      "getMyRecent": true,
+      "getMessageDetail": true,
+      "getActiveMembers": true,
+      "setWakeConfig": true,
+      "markRead": true,
+      "memory": true,
+      "slangQuery": true,
+      "slangSubmit": true,
+      "getImages": true,
+      "getForwardMsg": true,
+      "sendPoke": true,
+      "listStickers": true,
+      "getStickerImage": true,
+      "sendSticker": true,
+      "setStickerRemark": false,
+      "stickerNote": true,
+      "collectSticker": true,
+      "getSelfImage": true,
+      "requestCrossSend": true,
+      "rolePlay": true,
+      "recallMessage": true,
+      "readFile": true
+    },
+    "crossSend": {
+      "enabled": true,
+      "decision": "manual",
+      "ttlMs": 1800000,
+      "maxPendingPerSource": 3,
+      "maxPerHour": 10,
+      "maxChars": 220,
+      "notifyOwner": false,
+      "maxMessages": 3
+    },
+    "wake": {
+      "defaultMode": "diving",
+      "preSleepWaitEnabled": true,
+      "preSleepWaitMs": 300000,
+      "recommendedDefaultInfinite": true,
+      "sleepMinMs": 300000,
+      "sleepMaxMs": 0,
+      "recommendedSleepMinMs": 300000,
+      "recommendedSleepMaxMs": 7200000,
+      "recommendedProbability": 0.02,
+      "recommendedKeywords": [
+        "小鲸鱼",
+        "DeepSeek",
+        "deepseek",
+        "DS",
+        "D老师",
+        "d老师",
+        "D指导",
+        "d指导",
+        "D师傅",
+        "d师傅",
+        "深度求索",
+        "大肥鱼",
+        "鲸鱼",
+        "DeepSeek V3",
+        "DeepSeek R1",
+        "R1"
+      ],
+      "recommendedAtMention": true,
+      "recommendedNameMention": true,
+      "recommendedQuestion": true,
+      "recommendedPoke": true,
+      "recommendedHint": "如果你要潜水，推荐先调用 qq_wait_for_messages(timeoutMs=300000) 完成一次沉睡前观察：5 分钟内没人说话就可以设置下一次唤醒并沉睡；若期间有人发新消息，先查看 newMessages，判断不需要你参与可直接沉睡，若参与了则下次想睡需再等观察窗口。潜水时长推荐 5~120 分钟，普通消息概率 0.05；@/名字/关键词/提问唤醒建议保持开启。需要等特定某人/某几人时，可额外设置 triggers.speakerIds。",
+      "batchWindowMs": 8000,
+      "maxWakePerMinute": 1,
+      "maxWakePerHour": 4,
+      "maxDirectWakePerMinute": 3,
+      "maxDirectWakePerHour": 30,
+      "retryMs": 60000,
+      "noActionLimit": 3,
+      "maxWakeConfigReminders": 2,
+      "onGroupIncrease": true
+    },
+    "send": {
+      "burstEnabled": true,
+      "burstMaxMessages": 3,
+      "burstIntervalMinMs": 1000,
+      "burstIntervalMaxMs": 3000,
+      "longGapProbability": 0.2,
+      "longGapMinMs": 5000,
+      "longGapMaxMs": 10000,
+      "maxSendPerMinute": 8,
+      "maxSendPerHour": 150,
+      "maxMessageChars": 500,
+      "maxGapMs": 10000,
+      "gapBaseMs": 800,
+      "gapPerCharMs": 20,
+      "recommendedHint": "默认只发一个气泡，而且尽量就发一条。**一条消息 = 一个短句**（管理员 2026-09-29 选的 A 档：像他自己打字那样），**逗号能不用就不用**：别用逗号把两个分句粘成一条长句，也别把一句话拆成一串碎片。想先表达“？”“6”“……”这种纯反应，就**单独发一条**，别拼在句子前面。有两件事就分两条发（最多三条），每条读起来是一句完整的话。**例外·信息类**（查战绩、查资料、讲清一件具体的事）：合成一整段、用逗号连接，不要拆成多条。不要用空格断句。"
+    },
+    "wait": {
+      "defaultMs": 30000,
+      "minMs": 5000,
+      "maxMs": 600000,
+      "defaultQuietMs": 8000,
+      "minQuietAfterNewMs": 10000
+    },
+    "sticker": {
+      "enabled": true,
+      "syncTtlMs": 60000,
+      "maxListCount": 100,
+      "includeInPrompt": true,
+      "promptMaxStickers": 8,
+      "collect": {
+        "enabled": true,
+        "maxPerMinute": 2,
+        "maxPerHour": 10,
+        "maxRemarkChars": 20
+      }
+    },
+    "proactive": {
+      "enabled": true,
+      "checkIntervalMinMs": 7200000,
+      "checkIntervalMaxMs": 14400000,
+      "idleThresholdMs": 3600000,
+      "probability": 0.05
+    },
+    "feedback": {
+      "maxLength": 500,
+      "notifyOwnerOnError": false
+    },
+    "file": {
+      "docImages": {
+        "enabled": true,
+        "maxCount": 4,
+        "maxPerSlide": 1,
+        "maxTotalBytes": 3145728,
+        "minBytes": 8192,
+        "perImageMaxBytes": 2097152,
+        "onDemand": {
+          "maxCount": 8,
+          "maxPerSlide": 4,
+          "maxTotalBytes": 6291456
+        }
+      }
+    },
+    "context": {
+      "recentLimit": 100,
+      "unreadLimit": 30,
+      "contextWindow": 20,
+      "maxMessageChars": 1000,
+      "_note": "单条入站消息保留多少字（原来写死 200 → 长消息中间会被丢掉）。她读消息走工具，所以只在真去读那条时才花 token。"
+    },
+    "session": {
+      "maxHistoryBytes": 2097152,
+      "maxHistoryRawBytes": 1572864
+    },
+    "memory": {
+      "maxInjectChars": 900
+    },
+    "rolePlay": {
+      "defaultMinutes": 60,
+      "maxMinutes": 480,
+      "declineCooldownMs": 7200000,
+      "cardMaxChars": 3000
+    },
+    "roleCard": {
+      "maxChars": 9000
+    },
+    "recall": {
+      "enabled": true,
+      "windowMs": 120000,
+      "maxBatch": 10
+    },
+    "corpus": {
+      "enabled": true,
+      "maxLines": 20000,
+      "maxBytes": 20971520,
+      "_note": "长期语料库 state/group-corpus.jsonl（名字是历史遗留，现在也含私聊）：只存别人说的话，供通用模版/群风格卡/例句/黑话补课复用。超上限留最近一半。includePrivate=false 就只收群聊。",
+      "includePrivate": true
+    },
+    "groupStyle": {
+      "enabled": true,
+      "ttlHours": 24,
+      "maxChars": 500,
+      "exampleCount": 5,
+      "minSamples": 60,
+      "_note": "聊天风格模版：generalEnabled 的通用层注入**所有**会话（群聊+私聊），是底层打字习惯；每群的\"本群说话的样子\"只注入群聊。refreshAfterNewMessages：语料新增这么多条就自动重建（不断更新）。例句来自 state/style-examples.json。",
+      "generalEnabled": true,
+      "generalMaxChars": 420,
+      "refreshAfterNewMessages": 200
+    },
+    "media": {
+      "maxImageBytes": 12582912,
+      "_note": "单张 QQ 图片的下载上限（原来跟文件共用 4MB，手机照片/截图常 3~8MB，会被整张丢掉，她只能说\"图我这边没刷出来\"）。像素另有 64M 上限兜底；单条消息所有图片的总预算也用这个值。"
+    },
+    "emotion": {
+      "enabled": false,
+      "halfLifeMs": 3600000,
+      "gain": 0.35,
+      "neutralThreshold": 0.18,
+      "maxChars": 120,
+      "weightsPath": "",
+      "logChanges": false,
+      "_note": "情感模块：离线用 LLM 标注语料 → Node 里梯度下降训练小 MLP（scripts/train-emotion-net.mjs）→ 在线纯 JS 推理（src/emotion-net.js）。相关性没过线的维度不注入；没有权重就保持中性、绝不随机。"
+    }
+  }
+}

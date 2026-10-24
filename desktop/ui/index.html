@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 助手</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    /* 墨蓝深色 + 玻璃：面板半透明、靠底层渐变透上来 */
+    --bg: #0a0e17; --panel: #10151f; --panel2: #161c28; --line: #222a38;
+    --text: #f2f6fc; --dim: #a3adbf; --faint: #6b7484;
+    --accent: #5b8cff; --green: #4ade80; --amber: #fbbf24; --red: #f87171;
+    --radius: 14px;
+    --glass: rgba(20, 28, 44, 0.22);
+    --glass-side: rgba(14, 20, 32, 0.52);
+    --glass-strong: rgba(24, 34, 52, 0.5);
+    --glass-border: rgba(255, 255, 255, 0.09);
+  }
+  body.light {
+    /* 浅色：暖白底 + 柔灰面板，避免纯白刺眼；文字用深灰而不是纯黑 */
+    --bg: #eef1f6; --panel: rgba(255, 255, 255, 0.62); --panel2: rgba(240, 243, 248, 0.75); --line: rgba(0, 0, 0, 0.07);
+    --text: #20242b; --dim: #5c6573; --faint: #9aa0a8;
+    --accent: #2d5bff;
+    --glass: rgba(255, 255, 255, 0.45);
+    --glass-side: rgba(255, 255, 255, 0.62);
+    --glass-strong: rgba(255, 255, 255, 0.75);
+    --glass-border: rgba(0, 0, 0, 0.06);
+  }
+  body.light {
+    background:
+      radial-gradient(1100px 700px at 12% -8%, #dfe7f5 0%, transparent 60%),
+      radial-gradient(900px 600px at 110% 110%, #e6e9f8 0%, transparent 55%),
+      #eef1f6;
+  }
+  body {
+    /* 圆润字体栈：Segoe UI（UI 变体更圆）+ 雅黑 UI；正文略粗一点更像苹果 */
+    font-family: "Segoe UI", "Segoe UI Variable Text", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    font-weight: 450;
+    font-size: var(--font-size, 14px);
+    letter-spacing: 0.1px;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background: var(--bg); color: var(--text); height: calc(100vh / var(--ui-zoom, 1));
+    display: flex; flex-direction: column; overflow: hidden; user-select: none;
+  }
+  /* 数字/时间用等宽，列对齐更整齐 */
+  .clock, .meta, .kbd { font-variant-numeric: tabular-nums; }
+  /* 自定义标题栏（无边框窗口） */
+  .titlebar {
+    height: 34px; background: #0b0d10; display: flex; align-items: center;
+    padding: 0 6px 0 14px; -webkit-app-region: drag; user-select: none;
+    flex-shrink: 0; border-bottom: 1px solid var(--line);
+  }
+  .titlebar .tname { font-size: 12px; color: var(--dim); letter-spacing: .4px; }
+  .titlebar .spacer2 { flex: 1; }
+  .titlebar .wbtn {
+    width: 36px; height: 26px; border: none; background: transparent; color: var(--dim);
+    font-size: 13px; cursor: pointer; -webkit-app-region: no-drag; border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .titlebar .wbtn:hover { background: var(--panel2); color: var(--text); }
+  .titlebar .wbtn.close:hover { background: var(--red); color: #fff; }
+  .topbar {
+    height: 44px; background: var(--panel); border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; padding: 0 14px; gap: 12px; flex-shrink: 0;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .name { font-weight: 600; font-size: 14px; }
+  .mood { color: var(--dim); font-size: 12px; white-space: nowrap; }
+  .searchWrap { position: relative; margin-left: 10px; }
+  .search {
+    width: 240px; background: var(--panel2); border: 1px solid var(--line); border-radius: 7px;
+    padding: 6px 10px; color: var(--text); font-size: 12px; outline: none;
+  }
+  .search:focus { border-color: var(--accent); }
+  .kbd { font-size: 10px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; margin-left: 4px; }
+  .searchResults {
+    position: absolute; top: 34px; left: 0; width: 320px; background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px; display: none; z-index: 50;
+    box-shadow: 0 8px 24px rgba(0,0,0,.4); max-height: 260px; overflow-y: auto;
+  }
+  .searchResults.show { display: block; }
+  .sr { padding: 7px 9px; font-size: 12px; border-radius: 5px; cursor: pointer; color: var(--dim); }
+  .sr:hover { background: var(--line); color: var(--text); }
+  .spacer { flex: 1; }
+  .iconBtn { background: var(--panel2); border: 1px solid var(--line); color: var(--dim); border-radius: 6px; width: 28px; height: 26px; cursor: pointer; font-size: 13px; }
+  .iconBtn:hover { color: var(--text); border-color: var(--accent); }
+  .clock { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  .main { flex: 1; display: flex; min-height: 0; }
+
+  /* 左栏 */
+  .sessions { width: 210px; border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; flex-shrink: 0; }
+  .sessions h5 { font-size: 11px; color: var(--faint); padding: 10px 12px 5px; font-weight: 500; display: flex; justify-content: space-between; }
+  .session {
+    padding: 8px 12px; font-size: 13px; color: var(--dim); cursor: pointer;
+    border-left: 2px solid transparent; display: flex; align-items: center; gap: 7px;
+  }
+  .session:hover { background: var(--panel2); }
+  .session.active { background: var(--panel2); border-left-color: var(--accent); color: var(--text); }
+  .session .badge { font-size: 10px; background: var(--line); color: var(--dim); padding: 1px 6px; border-radius: 8px; margin-left: auto; }
+  .session .badge.unread { background: var(--accent); color: #fff; }
+  .session .badge.muted { color: var(--faint); }
+  .session .badge.green { background: #173a26; color: var(--green); }
+
+  /* 中栏 */
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chathead { height: 38px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 14px; gap: 10px; flex-shrink: 0; }
+  .chathead .title { font-size: 13px; font-weight: 600; }
+  .chathead .sub { font-size: 11px; color: var(--faint); }
+  .chathead .live { margin-left: auto; font-size: 11px; color: var(--green); display: none; }
+  .chathead .live.on { display: block; }
+
+  .messages { flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .daySep { align-self: center; font-size: 11px; color: var(--faint); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 2px 10px; margin: 6px 0; }
+  .msg { max-width: 70%; position: relative; }
+  .msg .bubble { padding: 8px 12px; border-radius: var(--radius); font-size: 14px; line-height: 1.55; word-break: break-word; }
+  .msg.her { align-self: flex-start; }
+  .msg.her .bubble { background: var(--panel2); border: 1px solid var(--line); }
+  .msg.her:hover { outline: 1px solid #2c3340; border-radius: var(--radius); }
+  .msg.me { align-self: flex-end; }
+  .msg.me .bubble { background: var(--accent); color: #fff; }
+  .msg .meta { font-size: 11px; color: var(--faint); margin-top: 3px; }
+  .msg.me .meta { text-align: right; }
+  .msg .tools { display: none; position: absolute; top: -10px; right: -8px; gap: 3px; }
+  .msg:hover .tools { display: flex; }
+  .msg .tools button { background: var(--panel2); border: 1px solid var(--line); color: var(--dim); font-size: 10px; border-radius: 4px; padding: 1px 6px; cursor: pointer; }
+  .msg .tools button:hover { color: var(--text); border-color: var(--accent); }
+  .msg.failed .bubble { border-color: var(--red); opacity: .85; }
+  .msg.failed .meta { color: var(--red); }
+  /* 消息类型 */
+  .msg .img { width: 200px; height: 130px; border-radius: 8px; background: linear-gradient(135deg,#1d2430,#2a3342); border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--faint); font-size: 12px; }
+  .msg .voice { display: flex; align-items: center; gap: 8px; min-width: 110px; }
+  .msg .voice .wave { display: flex; gap: 2px; align-items: center; }
+  .msg .voice .wave i { width: 3px; background: var(--accent); border-radius: 2px; }
+  .msg .who { font-size: 11px; color: var(--faint); margin-bottom: 2px; }
+  .msg.me .who { text-align: right; }
+  .msgImg { max-width: 200px; max-height: 160px; border-radius: 8px; display: block; min-height: 60px; min-width: 60px; background: rgba(255,255,255,0.06); }
+  .msg .sticker { font-size: 40px; line-height: 1; padding: 2px 4px; }
+  .msg .quoteRef { border-left: 2px solid var(--accent); padding: 2px 8px; margin-bottom: 4px; font-size: 12px; color: var(--dim); background: rgba(79,124,255,.06); border-radius: 4px; }
+  /* 正在输入 */
+  .typing { align-self: flex-start; display: none; align-items: center; gap: 6px; color: var(--faint); font-size: 12px; padding: 2px 0; }
+  .typing.on { display: flex; }
+  .typing .dots i { display: inline-block; width: 4px; height: 4px; background: var(--dim); border-radius: 50%; margin-right: 3px; animation: blink 1.2s infinite; }
+  .typing .dots i:nth-child(2) { animation-delay: .2s; }
+  .typing .dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+
+  .inputbar { height: 54px; border-top: 1px solid var(--line); display: flex; align-items: center; padding: 0 14px; gap: 8px; background: var(--panel); flex-shrink: 0; }
+  .inputbar input { flex: 1; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 13px; outline: none; }
+  .inputbar input:focus { border-color: var(--accent); }
+  .inputbar input::placeholder { color: var(--faint); }
+  .btn { background: var(--accent); color: #fff; border: none; border-radius: 8px; padding: 9px 16px; font-size: 13px; cursor: pointer; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: var(--panel2); border: 1px solid var(--line); color: var(--dim); }
+
+  /* 右栏 */
+  .side { width: 340px; border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; flex-shrink: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+  .tab { flex: 1; text-align: center; padding: 9px 0; font-size: 12px; color: var(--dim); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .panel { flex: 1; overflow-y: auto; padding: 12px 14px; display: none; }
+  .panel.active { display: block; }
+  .card { background: var(--panel2); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; }
+  .card h4 { font-size: 11px; color: var(--dim); font-weight: 500; margin-bottom: 6px; letter-spacing: .3px; }
+  .card p { font-size: 13px; line-height: 1.65; color: #c9ced6; }
+  body.light .card p { color: #333; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+  .kv span:first-child { color: var(--dim); }
+  .kv span:last-child { color: var(--text); }
+  .bar { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 9px; font-size: 11px; background: var(--line); color: var(--dim); margin: 2px 4px 2px 0; }
+  .pill.green { background: #173a26; color: var(--green); }
+  .pill.amber { background: #3a2f17; color: var(--amber); }
+  .tool { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+  .tool .status { margin-left: auto; font-size: 11px; }
+  .tool .status.on { color: var(--green); }
+  .tool .status.off { color: var(--faint); }
+  .switch { width: 30px; height: 16px; border-radius: 8px; background: var(--line); position: relative; cursor: pointer; margin-left: auto; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--faint); transition: .15s; }
+  .switch.on { background: #1d4ed8; }
+  .switch.on::after { left: 16px; background: #fff; }
+
+  .ctx { position: fixed; z-index: 100; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 5px; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,.5); display: none; }
+  .ctx.show { display: block; }
+  .ctx button { display: block; width: 100%; text-align: left; background: none; border: none; color: var(--text); font-size: 12px; padding: 7px 10px; border-radius: 5px; cursor: pointer; }
+  .ctx button:hover { background: var(--line); }
+  .ctx button.danger { color: var(--red); }
+
+  .statusbar { height: 26px; background: #0b0d10; border-top: 1px solid #1c2026; display: flex; align-items: center; padding: 0 14px; gap: 14px; font-size: 11px; color: var(--faint); flex-shrink: 0; }
+  body.light .statusbar { background: #eef0f3; }
+  .statusbar .kbd { font-size: 10px; }
+
+  /* 细滚动条（2026-10-24：原生亮灰太土） */
+  * { scrollbar-width: thin; scrollbar-color: #2a3038 transparent; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #2a3038; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #3d4652; background-clip: padding-box; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  body.light ::-webkit-scrollbar-thumb { background: #d3d8de; background-clip: padding-box; }
+  body.light ::-webkit-scrollbar-thumb:hover { background: #b9c0c9; background-clip: padding-box; }
+
+  /* ── 苹果玻璃化 v2 + 动画（2026-10-24 晚）──
+     面板半透明 + 更强 blur + 柔和阴影；切换/消息/按钮都带过渡。 */
+  body {
+    /* 光斑 + 细网格：毛玻璃有东西可糊，才看得出来 */
+    background:
+      radial-gradient(680px 460px at 18% 8%, rgba(91, 140, 255, 0.26), transparent 70%),
+      radial-gradient(560px 420px at 82% 14%, rgba(168, 91, 255, 0.20), transparent 70%),
+      radial-gradient(760px 520px at 58% 104%, rgba(45, 212, 191, 0.15), transparent 70%),
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      #0d1320;
+    background-size: auto, auto, auto, 44px 44px, 44px 44px, auto;
+  }
+  /* 壁纸层（2026-10-24 修复毛玻璃撕裂：壁纸只挂在最外层这一个容器上，
+     用 background-image（不用 img/transform——transform 会建独立合成层，
+     backdrop-filter 采样不到，三栏各糊各的 → 撕裂）。面板只留 blur。 */
+  #wallLayer {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none; display: none;
+    background-color: #070a10;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: cover;
+  }
+  #wallLayer.on { display: block; }
+  body.has-wallpaper { background: transparent !important; }
+  body.has-wallpaper::after {
+    content: ''; position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    /* 蒙版只压一点点，壁纸要能看清（2026-10-24 管理员：透明程度太低） */
+    background: rgba(7, 10, 16, 0.18);
+  }
+  .titlebar, .topbar, .main, .statusbar { position: relative; z-index: 2; }
+  #wallPicker { position: fixed; inset: 0; z-index: 800; display: none; background: rgba(4, 6, 10, 0.94); }
+  #wallPicker.on { display: block; }
+  .wallPickerBar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center;
+    gap: 8px; padding: 10px 14px; background: rgba(10, 14, 22, 0.8); backdrop-filter: blur(10px);
+  }
+  .wallPickerBar .wpTitle { font-size: 13px; color: var(--dim); }
+  .wallStage { position: absolute; inset: 56px 0 44px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .wallStage img { max-width: 100%; max-height: 100%; cursor: grab; user-select: none; transform-origin: center center; }
+  .wallStage img:active { cursor: grabbing; }
+  .wallHint { position: absolute; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 12px; color: var(--faint); }
+  .titlebar, .topbar, .sessions, .side, .chathead, .statusbar {
+    background: var(--glass) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(160%);
+    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(160%);
+    border-color: var(--glass-border) !important;
+  }
+  .card, .msg.her .bubble {
+    background: var(--glass) !important;
+    -webkit-backdrop-filter: blur(var(--glass-blur, 20px)) saturate(150%);
+    backdrop-filter: blur(var(--glass-blur, 20px)) saturate(150%);
+    border-color: var(--glass-border) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+  .msg.me .bubble {
+    border-radius: 16px !important;
+    box-shadow: 0 6px 22px rgba(91, 140, 255, 0.28);
+  }
+  /* 动画：面板淡入、消息滑入、按钮回弹 */
+  .panel { opacity: 0; transition: opacity .18s ease; }
+  .panel.active { opacity: 1; }
+  .msg { animation: msgIn .22s cubic-bezier(.2, .8, .3, 1); }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(6px) scale(.985); }
+    to { opacity: 1; transform: none; }
+  }
+  .btn, .session, .tab, .wbtn { transition: background .15s ease, color .15s ease, transform .1s ease, border-color .15s ease; }
+  .btn:active { transform: scale(.97); }
+  .session:hover { background: rgba(255, 255, 255, 0.05); }
+  .session.active {
+    background: rgba(91, 140, 255, 0.16) !important;
+    border-radius: 10px;
+    margin: 0 6px;
+    border-left-color: transparent !important;
+  }
+  .tab.active { border-bottom-color: var(--accent); }
+  /* 启动引导遮罩 */
+  /* 分段选择按钮（个性化设置用）：像 iOS 的 Segmented Control */
+  .btnGroup {
+    display: inline-flex; gap: 2px; padding: 2px;
+    background: var(--panel2);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+  }
+  .btnGroup .btn {
+    padding: 4px 12px; font-size: 12px; line-height: 1.2;
+    border: 1px solid transparent; border-radius: 7px;
+    background: transparent; color: var(--dim);
+  }
+  .btnGroup .btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+  body.light .btnGroup .btn:hover { background: rgba(0, 0, 0, 0.05); }
+  .btnGroup .btn.active,
+  .btnGroup .btn.active:hover {
+    background: var(--accent) !important;
+    border-color: transparent !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(45, 91, 255, 0.35);
+  }
+  body.no-anim * { transition: none !important; animation: none !important; }
+  .boot { position: fixed; inset: 0; z-index: 600; display: flex; align-items: center; justify-content: center; background: rgba(7,10,16,0.94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .boot.hidden { display: none; }
+  .bootCard { width: 400px; background: rgba(20,28,42,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 26px 24px; text-align: center; }
+  .bootCard .bootTitle { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  .bootCard .bootText { font-size: 13px; color: var(--dim); line-height: 1.7; }
+  .bootCard.wide { width: 560px; }
+  .bootCard .bootActions { margin-top: 18px; display: flex; gap: 8px; justify-content: center; }
+
+  /* ── 苹果式收尾（2026-10-24 晚）──
+     生硬的 1px 分界线换成极淡透明分隔；搜索框做成圆润的半透明胶囊。 */
+  .titlebar, .topbar, .chathead, .statusbar, .tabs { border-bottom-color: rgba(255, 255, 255, 0.045) !important; }
+  .sessions { border-right-color: rgba(255, 255, 255, 0.045) !important; }
+  .inputbar { border-top-color: rgba(255, 255, 255, 0.045) !important; }
+  body.light .titlebar, body.light .topbar, body.light .chathead,
+  body.light .statusbar, body.light .tabs { border-bottom-color: rgba(0, 0, 0, 0.05) !important; }
+  body.light .sessions { border-right-color: rgba(0, 0, 0, 0.05) !important; }
+  .searchWrap { position: relative; }
+  .searchWrap .search, .search {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border: 1px solid transparent !important;
+    border-radius: 10px !important;
+    padding: 6px 12px !important;
+    font-size: 12.5px;
+    transition: background .15s ease, box-shadow .15s ease;
+  }
+  .search::placeholder { color: var(--dim); }
+  .search:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.11) !important;
+    box-shadow: 0 0 0 3px rgba(91, 140, 255, 0.20);
+  }
+  body.light .search { background: rgba(0, 0, 0, 0.05) !important; }
+  body.light .search:focus { background: rgba(0, 0, 0, 0.08) !important; }
+  /* ── 分层玻璃（2026-10-24 二次修）──
+     壁纸只挂 #wallLayer（全局一张），所以侧栏各自 backdrop 也不会错位。
+     侧栏：各自磨砂；中间：不加 blur，只叠很淡的可读遮罩（通透）。 */
+  .sessions, .side {
+    background: var(--glass-side);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(150%);
+    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(150%);
+  }
+  body.light .sessions, body.light .side { background: var(--glass-side); }
+  .chat, .messages, .chathead {
+    background: transparent !important;
+  }
+  .messages {
+    /* 中间只压一点点暗，保证气泡文字可读，不糊壁纸 */
+    background: linear-gradient(rgba(7, 10, 16, 0.16), rgba(7, 10, 16, 0.10)) !important;
+  }
+  .chathead { background: rgba(7, 10, 16, 0.12) !important; }
+
+  /* ── macOS 组件（2026-10-24 三轮：tokens + 顶栏 + 侧栏）── */
+  /* tokens：强调色 / 圆角阶梯 / 字号阶梯 */
+  :root {
+    --accent: #0a84ff;
+    --radius-panel: 12px; --radius-btn: 8px; --radius-bubble: 16px;
+    --fs-title: 16px; --fs-body: 14px; --fs-group: 11px; --fs-aux: 12px;
+    --hairline: rgba(255, 255, 255, 0.08);
+  }
+  body.light { --accent: #007aff; --hairline: rgba(0, 0, 0, 0.07); }
+
+  /* 顶栏：整条共用一层 material（同一 alpha + 同一 blur），横向连续 */
+  .toolbar {
+    height: 48px; display: flex; align-items: center; gap: 12px; padding: 0 8px 0 14px;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(var(--glass-blur, 28px)) saturate(160%);
+    backdrop-filter: blur(var(--glass-blur, 28px)) saturate(160%);
+    border-bottom: 1px solid var(--hairline);
+    -webkit-app-region: drag;
+    flex-shrink: 0;
+  }
+  .tb-left { display: flex; align-items: center; gap: 8px; min-width: 0; -webkit-app-region: no-drag; }
+  .tb-left .mood { font-size: var(--fs-aux); color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tb-center { flex: 1; display: flex; justify-content: center; -webkit-app-region: no-drag; }
+  .tb-right { display: flex; align-items: center; gap: 6px; -webkit-app-region: no-drag; }
+  .toolbar .wbtn { -webkit-app-region: no-drag; }
+  .searchWrap { position: relative; display: flex; align-items: center; }
+  .searchIcon { position: absolute; left: 10px; color: var(--faint); font-size: 13px; pointer-events: none; }
+  .searchWrap .search {
+    width: 300px; padding: 0 54px 0 30px !important; height: 30px;
+    border-radius: var(--radius-btn) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    font-size: var(--fs-aux) !important;
+  }
+  .searchWrap .search:focus { background: rgba(255, 255, 255, 0.13) !important; box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.22); }
+  .searchWrap .kbd { position: absolute; right: 8px; pointer-events: none; }
+
+  /* tabbar：单独一层，只用 1px hairline 与上方分隔（不再自己叠材质） */
+  .tabs { background: transparent; border-bottom: 1px solid var(--hairline); }
+  .tab { padding: 10px 0; font-size: var(--fs-aux); }
+  .tab.active { border-bottom-color: var(--accent); }
+
+  /* 左侧栏：比主区略深的 material + 发丝分隔；选中行 accent 圆角 8px */
+  .sessions { background: var(--glass-side); border-right: 1px solid var(--hairline); }
+  .sessions h5 { font-size: var(--fs-group); font-weight: 500; letter-spacing: .3px; padding: 10px 14px 5px; }
+  .session {
+    height: 36px; margin: 2px 8px; padding: 0 12px; border-radius: var(--radius-btn);
+    font-size: var(--fs-body); border-left: none; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .session.active { background: var(--accent); color: #fff; }
+  .session.active .badge { background: rgba(255, 255, 255, 0.22); color: #fff; }
+  .badge.unread {
+    background: var(--accent); color: #fff; border-radius: 9px; min-width: 18px; height: 18px;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 11px; padding: 0 5px;
+  }
+
+  /* macOS 窗口按钮：左上角红黄绿三个圆点（hover 才显示符号） */
+  .traffic { display: flex; align-items: center; gap: 8px; -webkit-app-region: no-drag; margin-right: 4px; }
+  .traffic .dotBtn {
+    width: 12px; height: 12px; border-radius: 50%; border: none; cursor: pointer;
+    font-size: 9px; line-height: 1; color: rgba(0,0,0,0.5); padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .traffic .dotBtn span { opacity: 0; transition: opacity .12s ease; }
+  .traffic:hover .dotBtn span { opacity: 1; }
+  .traffic .close { background: #ff5f57; }
+  .traffic .min { background: #febc2e; }
+  .traffic .max { background: #28c840; }
+  /* 首次向导表单 */
+  .wzRow { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  .wzRow label { width: 74px; font-size: 12px; color: var(--dim); flex-shrink: 0; }
+  .wzRow input { flex: 1; min-width: 0; background: rgba(255,255,255,0.07); border: 1px solid transparent; border-radius: 8px; padding: 7px 10px; color: var(--text); font-size: 12.5px; outline: none; }
+  .wzRow input:focus { background: rgba(255,255,255,0.11); box-shadow: 0 0 0 3px rgba(10,132,255,0.2); }
+  .wzRow .btn { padding: 6px 10px; }
+  .wzRow textarea { flex: 1; min-width: 0; background: rgba(255,255,255,0.07); border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; color: var(--text); font-size: 12.5px; outline: none; resize: vertical; font-family: inherit; }
+  .wzRow textarea:focus { background: rgba(255,255,255,0.11); box-shadow: 0 0 0 3px rgba(10,132,255,0.2); }
+</style>
+</head>
+<body>
+  <!-- 壁纸层（在内容下面，可拖拽/缩放） -->
+  <div id="wallLayer"></div>
+  <!-- 取景器（二级菜单：拖动/滚轮调整壁纸） -->
+  <div id="wallPicker">
+    <div class="wallPickerBar">
+      <span class="wpTitle">调整壁纸</span>
+      <span class="spacer2"></span>
+      <button class="btn" id="wallOk">确定</button>
+      <button class="btn" id="wallCancel">取消</button>
+    </div>
+    <div class="wallStage"><img id="wallPreview" alt="" /></div>
+    <div class="wallHint">拖动移动 · 滚轮缩放</div>
+  </div>
+  <!-- 顶栏（macOS 单行）：左红黄绿+标题 / 中搜索 / 右状态+时间 -->
+  <div class="toolbar">
+    <div class="tb-left">
+      <div class="traffic">
+        <button class="dotBtn close" id="winClose" title="关闭"><span>✕</span></button>
+        <button class="dotBtn min" id="winMin" title="最小化"><span>─</span></button>
+        <button class="dotBtn max" id="winMax" title="最大化"><span>＋</span></button>
+      </div>
+      <span class="dot"></span>
+      <span class="name" id="personaName">AI 助手</span>
+      <span class="mood" id="mood">平静 · 略偏负 · 在刷 B 站</span>
+    </div>
+    <div class="tb-center">
+      <div class="searchWrap">
+        <span class="searchIcon">⌕</span>
+        <input class="search" id="search" placeholder="搜索消息 / 记忆 / 日记" />
+        <span class="kbd">Ctrl K</span>
+        <div class="searchResults" id="searchResults">
+          <div class="sr">消息：面板那个思路挺实用</div>
+          <div class="sr">记忆：他答应周末装网易云</div>
+          <div class="sr">日记：今天刷了一下午 B 站…</div>
+        </div>
+      </div>
+    </div>
+    <div class="tb-right">
+      <button class="iconBtn" id="themeBtn" title="切换深/浅色">◐</button>
+      <button class="iconBtn" id="notifyBtn" title="刷新">↻</button>
+      <span class="clock" id="clock">23:33</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="sessions" id="sessions">
+      <h5>私聊</h5>
+      <div class="session active" data-k="me">和他<span class="badge green">在线</span></div>
+      <h5>群聊</h5>
+      <div class="session" data-k="dsh">DSH 交流群<span class="badge unread">3</span></div>
+      <div class="session" data-k="cs">CS2 开黑群<span class="badge muted">静默</span></div>
+    </div>
+
+    <div class="chat">
+      <div class="chathead">
+        <span class="title" id="chatTitle">和他</span>
+        <span class="sub" id="chatSub">私聊 · 最近 30 分钟活跃</span>
+        <span class="live" id="live">她正在刷 B 站…</span>
+      </div>
+      <div class="messages" id="messages">
+        <div class="daySep">今天</div>
+        <div class="msg her">
+          <div class="bubble">刚才在刷 B 站，看到个讲 DSH 插件的</div>
+          <div class="meta">14:12</div>
+          <div class="tools"><button data-act="quote">引用</button><button data-act="copy">复制</button></div>
+        </div>
+        <div class="msg her">
+          <div class="bubble">面板那个思路挺实用</div>
+          <div class="meta">14:12</div>
+          <div class="tools"><button data-act="quote">引用</button><button data-act="copy">复制</button></div>
+        </div>
+        <div class="msg me">
+          <div class="bubble">给我看看</div>
+          <div class="meta">14:13</div>
+        </div>
+        <div class="msg her">
+          <div class="bubble"><div class="quoteRef">他：给我看看</div>等会，我评一句再发你</div>
+          <div class="meta">14:13</div>
+          <div class="tools"><button data-act="quote">引用</button><button data-act="copy">复制</button></div>
+        </div>
+        <div class="msg her">
+          <div class="bubble">好了，评论区 @ 你了</div>
+          <div class="meta">14:15</div>
+          <div class="tools"><button data-act="quote">引用</button><button data-act="copy">复制</button></div>
+        </div>
+        <div class="msg me">
+          <div class="bubble">看到了</div>
+          <div class="meta">14:18</div>
+        </div>
+        <div class="daySep">昨天</div>
+        <div class="msg her">
+          <div class="bubble"><div class="img">[图片：B 站截图]</div></div>
+          <div class="meta">23:40</div>
+        </div>
+        <div class="msg her">
+          <div class="bubble"><div class="voice"><span>语音</span><span class="wave"><i style="height:6px"></i><i style="height:12px"></i><i style="height:8px"></i><i style="height:14px"></i><i style="height:5px"></i></span><span>0:08</span></div></div>
+          <div class="meta">23:41</div>
+        </div>
+        <div class="msg her">
+          <div class="bubble"><span class="sticker">😴</span></div>
+          <div class="meta">23:42</div>
+        </div>
+      </div>
+      <div class="typing" id="typing"><span class="dots"><i></i><i></i><i></i></span>她正在输入…</div>
+      <!-- 只读监控：不发消息（发消息去 QQ 里发，或者桥接控制台） -->
+    </div>
+
+    <div class="side">
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-tab="mem">记忆</div>
+        <div class="tab" data-tab="diary">日记</div>
+        <div class="tab" data-tab="mood">情绪</div>
+        <div class="tab" data-tab="tools">工具</div>
+        <div class="tab" data-tab="console">控制台</div>
+        <div class="tab" data-tab="gateway">网关</div>
+        <div class="tab" data-tab="dsh">DSH</div>
+        <div class="tab" data-tab="cfg">设置</div>
+      </div>
+
+      <div class="panel active" id="panel-mem">
+        <div class="card"><h4>她的记忆</h4>
+          <div id="memBox"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-diary">
+        <div class="card"><h4>今天 · 14:30</h4>
+          <p>刷了一下午 B 站，看那个插件面板的演示，觉得场景切换挺聪明的。他好像挺忙的，没怎么找我。</p>
+        </div>
+        <div class="card"><h4>昨天 · 23:10</h4>
+          <p>他今天睡得早，说别弄太晚。我嘴上说知道了，其实又刷了半小时。</p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-mood">
+        <div class="card"><h4>现在</h4>
+          <div class="kv"><span>愉快</span><span>+0.18</span></div>
+          <div class="bar"><i style="width:59%"></i></div>
+          <div class="kv" style="margin-top:8px"><span>唤醒</span><span>-0.25</span></div>
+          <div class="bar"><i style="width:37%"></i></div>
+          <div class="kv" style="margin-top:8px"><span>支配</span><span>-0.01</span></div>
+          <div class="bar"><i style="width:50%"></i></div>
+        </div>
+        <div class="card"><h4>最近让她情绪变的事</h4>
+          <p>· 他说「哦牛批」（+0.36）</p>
+          <p>· 他说「笨蛋程莫雯」（-0.05，已降权）</p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-tools">
+        <div class="card"><h4>能力（按环境检测）</h4>
+          <div id="capList"><p style="color:var(--faint);font-size:12px">检测中…</p></div>
+        </div>
+        <div class="card"><h4>她能用的工具（按会话）</h4>
+          <p><span class="pill green">qq_send_message</span><span class="pill green">qq_get_unread</span><span class="pill green">bili_search</span><span class="pill green">bili_subtitle</span><span class="pill green">bili_reply</span></p>
+          <p style="margin-top:6px;font-size:12px;color:var(--dim)">群聊里只给只读工具；私聊可以发消息/评论。</p>
+        </div>
+        <div class="card"><h4>最近调用</h4>
+          <div id="toolLog"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-console">
+        <div class="card"><h4>运行状态</h4>
+          <div id="cli-status"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+        <div class="card"><h4>操作</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <button class="btn" id="cliSilent">切换静默</button>
+            <button class="btn" id="cliRefresh">刷新</button>
+            <button class="btn" id="cliFull">打开完整控制台</button>
+          </div>
+        </div>
+        <div class="card"><h4>唤醒模式</h4>
+          <div class="btnGroup" id="cliWake">
+            <button class="btn" data-wake="diving">潜水（安静）</button>
+            <button class="btn" data-wake="active">活跃（多说话）</button>
+          </div>
+          <p style="font-size:12px;color:var(--dim);margin-top:8px" id="cliWakeHint">当前：—</p>
+        </div>
+        <div class="card"><h4>代发测试</h4>
+          <div class="wzRow"><input id="cliMsg" placeholder="给管理员发一条（测试消息）" /><button class="btn" id="cliSend">发送</button></div>
+          <p style="font-size:12px;color:var(--dim);margin-top:6px" id="cliSendHint">用她的号发到管理员私聊（不会进群）。</p>
+        </div>
+        <div class="card"><h4>人设</h4>
+          <div id="cliRoles"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+        <div class="card"><h4>群聊</h4>
+          <div id="cliGroups"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+        <div class="card"><h4>白名单</h4>
+          <div id="cliAllow"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+        <div class="card"><h4>账号</h4>
+          <div id="cliAccounts"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+        <div class="card"><h4>说明</h4>
+          <p style="font-size:12px;color:var(--dim);line-height:1.7">
+            这里是她的运行控制（原生面板）。<br>
+            静默 = 群里一个字不发、也不再被群吵醒（私聊照常）。<br>
+            更细的参数（发送/工具开关/撤回）在「完整控制台」里。
+          </p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-gateway">
+        <div class="card"><h4>QQ 网关（NapCat）</h4>
+          <div id="gw-status"><p style="color:var(--faint);font-size:12px">检查中…</p></div>
+        </div>
+        <div class="card"><h4>操作</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <button class="btn" id="gwRestart">重启网关</button>
+            <button class="btn" id="gwLogin">重新快速登录</button>
+            <button class="btn" id="gwWebui">打开 NapCat WebUI</button>
+          </div>
+        </div>
+        <div class="card"><h4>说明</h4>
+          <p style="font-size:12px;color:var(--dim);line-height:1.7">
+            网关 = QQ 的连接层（NapCat）。平时不用管：QQAI 启动时自动快速登录。<br>
+            掉线/换号时才需要「重新快速登录」（用 QQ 已保存的登录态，不用扫码）。<br>
+            OneBot 端口：WS 3002 / HTTP 3003（配置在 NapCat WebUI 里）。
+          </p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-dsh">
+        <div class="card"><h4>她的 DSH（3081）</h4>
+          <div id="dsh-status"><p style="color:var(--faint);font-size:12px">检查中…</p></div>
+        </div>
+        <div class="card"><h4>会话</h4>
+          <div id="dsh-session"><p style="color:var(--faint);font-size:12px">加载中…</p></div>
+        </div>
+        <div class="card"><h4>操作</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+            <button class="btn" id="dshRestart">重启她的 DSH</button>
+            <button class="btn" id="dshOpen">打开 DSH WebUI</button>
+            <button class="btn" id="dshLogs">打开日志目录</button>
+            <button class="btn" id="dshBackup">备份她（记忆/日记/情绪）</button>
+          </div>
+          <p style="font-size:12px;color:var(--dim);margin-top:8px" id="backupHint">备份会存到 D:\QQaibot\backups\（zip）。</p>
+        </div>
+        <div class="card"><h4>说明</h4>
+          <p style="font-size:12px;color:var(--dim);line-height:1.7">
+            她是独立的 DSH 实例（D:\QQaibot\dsh-her，自己的 API key）。<br>
+            重启它 = 她的会话重建（记忆在桥接里，不会丢）。<br>
+            日常不用碰；她行为异常/卡住时才重启。
+          </p>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-cfg">
+        <div class="card"><h4>运行</h4><div id="cfg-run"><p style="color:var(--faint);font-size:12px">加载中…</p></div></div>
+        <div class="card"><h4>行为</h4><div id="cfg-behavior"><p style="color:var(--faint);font-size:12px">加载中…</p></div></div>
+        <div class="card"><h4>开关</h4><div id="cfg-switches"><p style="color:var(--faint);font-size:12px">加载中…</p></div></div>
+
+        <div class="card"><h4>个性化</h4>
+          <div class="kv"><span>主题</span><span class="btnGroup">
+            <button class="btn" data-pref="theme" data-v="dark">深色</button>
+            <button class="btn" data-pref="theme" data-v="light">浅色</button>
+          </span></div>
+          <div class="kv"><span>字号</span><span class="btnGroup">
+            <button class="btn" data-pref="font" data-v="12">小</button>
+            <button class="btn" data-pref="font" data-v="14">中</button>
+            <button class="btn" data-pref="font" data-v="16">大</button>
+          </span></div>
+          <div class="kv"><span>毛玻璃</span><span class="btnGroup">
+            <button class="btn" data-pref="glass" data-v="8">弱</button>
+            <button class="btn" data-pref="glass" data-v="28">中</button>
+            <button class="btn" data-pref="glass" data-v="44">强</button>
+          </span></div>
+          <div class="kv"><span>动画</span><span class="btnGroup">
+            <button class="btn" data-pref="anim" data-v="1">开</button>
+            <button class="btn" data-pref="anim" data-v="0">关</button>
+          </span></div>
+          <div class="kv"><span>壁纸</span><span class="btnGroup">
+            <button class="btn" id="wallPick">选图片</button>
+            <button class="btn" id="wallClear">清除</button>
+          </span></div>
+          <div class="wzRow" style="margin-top:8px">
+            <label>天气城市</label><input id="weatherCity" placeholder="宁波" /><button class="btn" id="weatherSave">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <span>● 桥接正常</span><span>● DSH 就绪</span><span>● QQ 已连接</span>
+    <span class="spacer"></span>
+    <span><span class="kbd">Ctrl 1-6</span> 面板 <span class="kbd">Ctrl ↑↓</span> 会话 <span class="kbd">Enter</span> 发送</span>
+  </div>
+
+  <div class="ctx" id="ctx"></div>
+
+  <!-- 启动引导（2026-10-24）：服务没起来时先显示这个，像 QQ 登录一样 -->
+  <div id="boot" class="boot">
+    <div class="bootCard" id="bootCard">
+      <div class="bootTitle" id="bootTitle">正在启动…</div>
+      <div class="bootText" id="bootText">检查服务中</div>
+      <div class="bootActions" id="bootActions"></div>
+
+      <!-- 首次向导：配置缺项时显示（选目录 / 填 QQ 号 / 保存并启动） -->
+      <div id="bootWizard" style="display:none;text-align:left;margin-top:14px">
+        <div class="wzRow"><label>桥接目录</label><input id="wzBridge" placeholder="D:\qq-bridge" /><button class="btn" id="wzPickBridge">选</button></div>
+        <div class="wzRow"><label>她的实例</label><input id="wzHer" placeholder="D:\QQaibot\dsh-her" /><button class="btn" id="wzPickHer">选</button></div>
+        <div class="wzRow"><label>NapCat</label><input id="wzNapcat" placeholder="D:\QQaibot\napcat" /><button class="btn" id="wzPickNapcat">选</button></div>
+        <div class="wzRow"><label>QQ 号</label><input id="wzQQ" placeholder="机器人 QQ 号" /></div>
+        <div class="wzRow"><label>人格名</label><input id="wzName" placeholder="（可选，留空就用默认）" /></div>
+        <div class="wzRow"><label>API Key</label><input id="wzKey" type="password" placeholder="DeepSeek API key（sk-...）" /></div>
+        <div class="wzRow" style="align-items:flex-start"><label style="padding-top:6px">人格卡</label><textarea id="wzCard" rows="4" placeholder="名字 / 性格 / 说话方式 / 背景 / 禁忌（可选，留空用默认人设）"></textarea></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+          <button class="btn" id="wzSave">保存并启动</button>
+        </div>
+      </div>
+
+      <!-- 扫码登录（NapCat 的二维码图片，像微信登录那样直接显示在这里） -->
+      <img id="bootQr" alt="二维码" style="display:none;width:300px;height:300px;margin:14px auto 0;border-radius:12px;background:#fff;padding:8px" />
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

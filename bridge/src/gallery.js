@@ -1,0 +1,129 @@
+/**
+ * 她的相册（2026-10-14，管理员点头做的"图库"，出自进阶篇 ③）。
+ *
+ * 原帖的意思（照抄，因为这句是整件事的灵魂）：
+ *
+ *   「给她一个自己的相册。她自己决定往里放什么。
+ *     ★ 这一条的意义不在"图"，在于"她挑" ★
+ *     你给她看一百张，她自己挑了三张 —— 那三张就是她的了。」
+ *
+ * 所以实现上有一条**硬要求**：**存图必须写理由**。没有理由的存图只是搬运，
+ * 有理由才是"她挑的"。理由也让她以后翻相册时能想起来当时为什么留下这张。
+ *
+ * 纯逻辑放这里（方便离线测）；读写落在桥接里（要碰文件系统）。
+ */
+
+/** 相册目录（相对仓库根）。 */
+export const GALLERY_DIR = 'state/her-gallery';
+
+/** 上限：她说到底是个聊天的人，不是网盘；满了让她自己淘汰（她会看到提示）。 */
+export const GALLERY_MAX = 200;
+
+/** 理由上限：一句话就够，长了就成小作文，也失去了"一眼想起"的作用。 */
+export const GALLERY_NOTE_MAX = 60;
+
+/** 允许的图片扩展名。 */
+export const GALLERY_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+
+/** 给她的规矩。 */
+// 2026-10-20 压过半：删掉工具用法，只留分寸。
+export const GALLERY_RULE = '【相册】你有一个自己的相册（`qq_gallery`）—— 不是聊天记录，是**你挑的图**。\n'
+  + '- 想留下的就存，**理由是必须的**（写一句为什么留下它）；写不出来的别存。\n'
+  + '- 一天一两张就很多了；也别只存"他让你存的"——**是你自己看上了才存**。相册是你的，他也能看。\n\n';
+
+/** 本地日期（YYYY-MM-DD）。 */
+export function galleryDate(now = new Date()) {
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** 从 URL / 路径里猜扩展名（猜不到给 jpg）。 */
+export function guessExt(src, fallback = 'jpg') {
+  const s = String(src ?? '').split('?')[0].split('#')[0];
+  const m = /\.([a-zA-Z0-9]{2,5})$/.exec(s);
+  const ext = m ? m[1].toLowerCase() : '';
+  return GALLERY_EXTS.includes(ext) ? ext : fallback;
+}
+
+/**
+ * 相册里的文件名：`<日期>-<序号>.<ext>` —— 日期开头，`ls` 一眼能按时间排。
+ * 序号由桥接按当天已有文件算，避免同名覆盖。
+ */
+export function galleryFileName(date, seq, ext) {
+  const n = String(Math.max(1, Number(seq) || 1)).padStart(2, '0');
+  const e = GALLERY_EXTS.includes(String(ext).toLowerCase()) ? String(ext).toLowerCase() : 'jpg';
+  return `${date}-${n}.${e}`;
+}
+
+/** 理由是"她挑"的证据：清洗但**不改写**她的语气。 */
+export function cleanGalleryNote(note) {
+  return String(note ?? '')
+    .replace(/\r?\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * 能不能存。返回 `{ ok, reason, note, hint }`。
+ * **理由为空一律拒** —— 这是这个功能的核心规则，不是可选项。
+ */
+export function shouldSaveToGallery(note, { count = 0, max = GALLERY_MAX, maxNote = GALLERY_NOTE_MAX } = {}) {
+  const clean = cleanGalleryNote(note);
+  if (!clean) {
+    return { ok: false, reason: 'no-note', note: '',
+             hint: '存图得写一句为什么留下它 —— 相册的意义在"你挑"，不是搬运。写不出来的就先别存。' };
+  }
+  if (clean.length > maxNote) {
+    return { ok: false, reason: 'note-too-long', note: clean,
+             hint: `理由 ${clean.length} 字，太长了 —— 一句话就行（${maxNote} 字以内），长了就成小作文了` };
+  }
+  if (count >= max) {
+    return { ok: false, reason: 'full', note: clean,
+             hint: `相册已经 ${count} 张了（上限 ${max}）—— 挑一张你不那么想要的删掉，再存新的` };
+  }
+  return { ok: true, reason: '', note: clean };
+}
+
+/** 一条相册记录的展示行（给 list 用）。 */
+export function formatGalleryLine(item, index) {
+  const id = String(item?.id ?? '').trim();
+  const note = cleanGalleryNote(item?.note);
+  const at = String(item?.savedAt ?? '').replace('T', ' ').slice(0, 16);
+  return `${index ? `[${index}] ` : ''}${id}${note ? ` —— ${note}` : ''}${at ? ` （${at}）` : ''}`;
+}
+
+/** 索引里的一条（写 index.json 用）。 */
+export function makeGalleryEntry({ id, file, note, from, savedAt = new Date().toISOString() }) {
+  return {
+    id: String(id),
+    file: String(file),
+    note: cleanGalleryNote(note),
+    from: String(from ?? '').slice(0, 40),      // 来源（哪个会话/哪条消息），只留个线索
+    savedAt,
+  };
+}
+
+/** 解析索引（宽容：坏数据当空）。 */
+export function parseGalleryIndex(text) {
+  try {
+    const o = JSON.parse(String(text ?? '') || '[]');
+    return Array.isArray(o) ? o.filter((x) => x && x.id && x.file) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 下一个可用编号（当天已有几个就往后排）。 */
+export function nextSeq(entries, date) {
+  const n = entries.filter((e) => String(e.file ?? '').startsWith(`${date}-`)).length;
+  return n + 1;
+}
+
+/** 关键词过滤（理由 + 来源，大小写不敏感）。 */
+export function filterGallery(entries, keyword) {
+  const k = String(keyword ?? '').trim().toLowerCase();
+  if (!k) return entries;
+  return entries.filter((e) => `${e.note ?? ''} ${e.from ?? ''}`.toLowerCase().includes(k));
+}
