@@ -41,7 +41,7 @@ const NAPCAT_DIR = cfg.napcatDir || 'D:\\NapCat\\app';
 const NODE_EXE = cfg.nodeExe || 'D:\\Program Files\\nodejs\\node.exe';
 const PYTHON = cfg.pythonExe || 'C:\\Program Files\\Python312\\python.exe';
 const DSH_BIN = cfg.dshBin || 'C:\\Users\\zjin6\\AppData\\Roaming\\npm\\node_modules\\@deepseek-ai\\dsh\\lib\\bin.js';
-// 注意：这里**不能有默认号**。空了就空着，NapCat 会被跳过（免得误登别人的号）。
+// 这里不能有默认号：空了就空着，NapCat 会被跳过（免得误登别人的号）。
 // 2026-10-25：原来默认 '3167579121'，别人配置空时会登成这个号。
 const NAPCAT_QQ = String(cfg.qq || '').trim();
 const PORT = {

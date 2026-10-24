@@ -27,7 +27,7 @@ function tick() {
 }
 tick(); setInterval(tick, 10000);
 
-// ---------- 状态 ----------
+// 
 const state = {
   key: 'private:984776985',
   conversations: [],
@@ -35,7 +35,6 @@ const state = {
   messages: [],
   tab: 0,
   forceBottom: false,   // 切会话/首次进入 → 拉到底
-  newMessage: false,
 };
 const API = (p, method = 'GET', body = null) => (window.api ? window.api.bridge({ path: p, method, body }) : Promise.resolve({ ok: false, error: 'no api (preview mode)' }));
 
@@ -71,7 +70,7 @@ function fmtTime(t) {
   return p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
-// ---------- 会话 ----------
+// 
 async function loadConversations() {
   const r = await API('/api/socialV2/states');
   if (!r.ok || !r.json?.conversations) return;
@@ -134,7 +133,7 @@ function sessionRow(c, label) {
   return `<div class="session${active}" data-k="${esc(c.key)}">${esc(label)}${badge}</div>`;
 }
 
-// ---------- 消息 ----------
+// 
 async function loadMessages() {
   const r = await API('/api/socialV2/recent?key=' + encodeURIComponent(state.key) + '&limit=40');
   if (!r.ok || !r.json?.messages) return;
@@ -149,7 +148,6 @@ async function loadMessages() {
   state.messages = r.json.messages;
   // 有新消息（最后一条变了）→ 如果用户原本在底部就跟着到底（QQ/微信行为）
   if (last && (!prevLast || (last.text !== prevLast.text) || (last.atText !== prevLast.atText))) {
-    state.newMessage = true;
   }
   renderMessages();
 }
@@ -167,7 +165,6 @@ function renderMessages() {
   const nearBottom = prevTop + box.clientHeight >= box.scrollHeight - 80;
   const shouldStick = state.forceBottom || nearBottom;
   state.forceBottom = false;
-  state.newMessage = false;
   box.innerHTML = state.messages.map((m) => {
     // 她的第一人称视角：她说的话在右边（"我"），他说的在左边（对方）。
     const mine = m.isSelf ? 'me' : 'her';
@@ -198,7 +195,7 @@ function renderMessages() {
   }
 }
 
-// ---------- 情绪 / 日记（主进程读文件） ----------
+// 
 async function loadEmotion() {
   try {
     const e = await window.api.readEmotion?.();
@@ -248,9 +245,9 @@ async function loadMemory() {
     .join('');
 }
 
-// ---------- 发送（界面只读监控，已移除发送框） ----------
+// 
 
-// ---------- tabs ----------
+// 
 const tabs = [...document.querySelectorAll('.tab')];
 function activateTab(idx) {
   tabs.forEach((x, i) => x.classList.toggle('active', i === idx));
@@ -273,7 +270,7 @@ function activateTab(idx) {
 }
 tabs.forEach((el, i) => el.addEventListener('click', () => activateTab(i)));
 
-// ---------- 控制台（原生面板，2026-10-24 替换掉嵌网页） ----------
+// 
 async function loadConsole() {
   const kv = (k, v, color) => `<div class="kv"><span>${esc(k)}</span><span${color ? ` style="color:${color}"` : ''}>${esc(v)}</span></div>`;
   const box = $('#cli-status');
@@ -459,7 +456,7 @@ async function loadAccounts() {
   }
 }
 loadRoles(); loadCliGroups(); loadAllow(); loadAccounts();
-// ---------- DSH 管理面板（2026-10-24） ----------
+// 
 // 她的独立 DSH 实例（3081）：状态 / 当前会话 / 重启 / 日志。
 async function loadDsh() {
   const s = await window.api?.status?.();
@@ -524,7 +521,7 @@ document.getElementById('dshBackup')?.addEventListener('click', async () => {
   }
 });
 
-// ---------- 网关面板（自己的 UI，不嵌 NapCat 网页） ----------
+// 
 // 2026-10-24：不再嵌 6099（风格不搭、还会空白），改成状态卡 + 操作按钮。
 async function loadGateway() {
   const s = await window.api?.status?.();
@@ -575,7 +572,7 @@ document.getElementById('gwWebui')?.addEventListener('click', () => {
   window.api?.openUrl?.('http://127.0.0.1:6099');
 });
 
-// ---------- 设置面板（真实配置） ----------
+// 
 async function loadConfig() {
   const r = await API('/api/socialV2/config');
   if (!r.ok || !r.json) return;
@@ -621,12 +618,12 @@ async function loadConfig() {
 loadConfig();
 setInterval(loadConfig, 30000);
 
-// ---------- 窗口按钮 ----------
+// 
 document.getElementById('winMin')?.addEventListener('click', () => window.api?.winMinimize?.());
 document.getElementById('winMax')?.addEventListener('click', () => window.api?.winMaximize?.());
 document.getElementById('winClose')?.addEventListener('click', () => window.api?.winClose?.());
 
-// ---------- 轮询 ----------
+// 
 async function loadGroups() {
   const r = await API('/api/socialV2/groups?all=1');
   if (r.ok && r.json?.groups) {
@@ -685,7 +682,7 @@ async function startData() {
   setInterval(loadEmotion, 10000);
 }
 
-// ---------- 启动引导（像 QQ / 微信登录那样：服务没起来先显示引导） ----------
+// 
 // 首次向导：填目录/QQ号 → 保存 settings.json → 重启（配置生效）
 async function showWizard() {
   const get = (id) => document.getElementById(id);
@@ -861,7 +858,7 @@ async function bootCheck() {
 }
 bootCheck();
 
-// ---------- 顶栏按钮：静默 / 主题 / 刷新 / 搜索 ----------
+// 
 document.getElementById('themeBtn')?.addEventListener('click', () => {
   prefs.theme = prefs.theme === 'light' ? 'dark' : 'light';
   applyPrefs();
@@ -889,7 +886,7 @@ document.getElementById('search')?.addEventListener('input', (e) => {
   });
 });
 
-// ---------- 个性化（本地偏好：主题/字号/毛玻璃/动画/壁纸） ----------
+// 
 const PREF_KEY = 'qqai-prefs';
 const DEFAULT_PREFS = { theme: 'dark', font: '14', glass: '28', anim: '1', wallpaper: '', wallPos: 'center', wallFit: 'cover' };
 let prefs = { ...DEFAULT_PREFS };
@@ -1020,7 +1017,7 @@ document.getElementById('wallCancel')?.addEventListener('click', closeWallPicker
 }
 applyPrefs();
 
-// ---------- 快捷键（2026-10-25：Ctrl+1~8 切 tab、Ctrl+R 刷新、Esc 关取景器） ----------
+// 
 window.addEventListener('keydown', (e) => {
   // 输入框里打字时不拦截
   const tag = (e.target && e.target.tagName) || '';
