@@ -29,7 +29,8 @@ tick(); setInterval(tick, 10000);
 
 // 
 const state = {
-  key: 'private:984776985',
+  ownerQQ: '',
+  key: '',
   conversations: [],
   groups: {},
   messages: [],
@@ -75,6 +76,11 @@ async function loadConversations() {
   const r = await API('/api/socialV2/states');
   if (!r.ok || !r.json?.conversations) return;
   state.conversations = r.json.conversations;
+  if (!state.key) {
+    state.key = state.ownerQQ
+      ? 'private:' + state.ownerQQ
+      : (state.conversations[0]?.key || '');
+  }
   renderSessions();
 }
 function updateChatHead() {
@@ -86,7 +92,7 @@ function updateChatHead() {
   const isGroup = key.startsWith('group:');
   const name = isGroup
     ? (state.groups[key] || key)
-    : (key === 'private:984776985' ? '管理员' : '私聊 ' + key.split(':')[1]);
+    : (state.ownerQQ && key === 'private:' + state.ownerQQ ? '管理员' : '私聊 ' + key.split(':')[1]);
   title.textContent = name;
   const count = conv?.recentCount ?? 0;
   sub.textContent = (isGroup ? '群聊' : '私聊') + ' · ' + count + ' 条';
@@ -101,9 +107,9 @@ function renderSessions() {
   const grps = state.conversations.filter((c) => c.key.startsWith('group:') && usable(c));
   let html = '<h5>私聊</h5>';
   for (const c of priv) {
-    // 私聊可能有多个号：用 QQ 号区分（984776985 = 他）
+    // 私聊可能有多个号：用 QQ 号区分，并按配置标记管理员。
     const qq = c.key.split(':')[1];
-    html += sessionRow(c, qq === '984776985' ? '管理员' : `私聊 ${qq}`);
+    html += sessionRow(c, state.ownerQQ && qq === state.ownerQQ ? '管理员' : `私聊 ${qq}`);
   }
   html += '<h5>群聊</h5>';
   for (const c of grps) {
@@ -348,10 +354,15 @@ document.getElementById('cliSend')?.addEventListener('click', async (e) => {
   const hint = document.getElementById('cliSendHint');
   const msg = (input?.value || '').trim();
   if (!msg) return;
+  const adminQQ = String(state.ownerQQ || '').trim();
+  if (!/^\d{5,12}$/.test(adminQQ)) {
+    if (hint) hint.textContent = '请先在账号设置中填写有效的管理员 QQ。';
+    return;
+  }
   btn.disabled = true;
   btn.textContent = '发送中…';
   try {
-    const r = await API('/api/test-send', 'POST', { kind: 'private', id: 984776985, message: msg });
+    const r = await API('/api/test-send', 'POST', { kind: 'private', id: Number(adminQQ), message: msg });
     if (hint) hint.textContent = r.ok ? '已发到管理员私聊（用她的号）' : `失败：${r.json?.error || r.error || '未知'}`;
     if (r.ok && input) input.value = '';
   } finally {
@@ -438,6 +449,8 @@ async function loadAccounts() {
   if (!box) return;
   const s = await window.api?.status?.();
   if (!s) return;
+  state.ownerQQ = String(s.ownerQQ || '').trim();
+  if (!state.key && state.ownerQQ) state.key = 'private:' + state.ownerQQ;
   const row = (k, v) => '<div class="kv"><span>' + esc(k) + '</span><span>' + esc(v || '—') + '</span></div>';
   box.innerHTML = [
     row('机器人 QQ', s.botQQ),
@@ -450,6 +463,15 @@ async function loadAccounts() {
     btn.onclick = async () => {
       const qq = (document.getElementById('ownerQQ')?.value || '').trim();
       const ok = await window.api?.saveOwner?.(qq);
+      if (ok) {
+        state.ownerQQ = String(Number(qq));
+        state.key = 'private:' + state.ownerQQ;
+        state.messages = [];
+        state.forceBottom = true;
+        renderSessions();
+        await loadMessages();
+        await loadEmotion();
+      }
       btn.textContent = ok ? '已保存（重启桥接生效）' : '失败';
       setTimeout(() => { btn.textContent = '保存'; }, 2000);
     };
@@ -516,8 +538,8 @@ document.getElementById('dshBackup')?.addEventListener('click', async () => {
   if (hint) {
     hint.textContent = out
       ? `已备份：${out}`
-      : '备份失败（看 D:\\QQaibot\\backups 权限/磁盘）';
-    if (out) window.api?.openPath?.('D:\\QQaibot\\backups');
+      : '备份失败（请检查桥接目录权限和磁盘空间）';
+    if (out) window.api?.openPath?.(out.replace(/[\\/][^\\/]+$/, ''));
   }
 });
 
@@ -753,6 +775,8 @@ async function bootCheck() {
   const qr = document.getElementById('bootQr');
   const s = await window.api?.status?.();
   if (!s) { setTimeout(bootCheck, 2000); return; }
+  state.ownerQQ = String(s.ownerQQ || '').trim();
+  if (!state.key && state.ownerQQ) state.key = 'private:' + state.ownerQQ;
   // 人格名跟着配置走（settings.personaName；空则 "AI 助手"）
   if (s.personaName) {
     const pn = document.getElementById('personaName');

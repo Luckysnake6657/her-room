@@ -62,7 +62,7 @@ const children = new Map();
 
 function logLine(msg) {
   try {
-    fs.appendFileSync('D:\\qq-bridge\\state\\qqai-supervisor.log', `${new Date().toISOString()} ${msg}\n`);
+    fs.appendFileSync(path.join(BRIDGE_DIR, 'state', 'qqai-supervisor.log'), `${new Date().toISOString()} ${msg}\n`);
   } catch {}
 }
 
@@ -227,10 +227,19 @@ function consoleToken() {
   try { return fs.readFileSync(TOKEN_FILE, 'utf8').trim(); } catch { return ''; }
 }
 
-function agentToken() {
+function ownerQQ() {
   try {
-    const s = JSON.parse(fs.readFileSync('D:\\qq-bridge\\state\\social-v2.json', 'utf8'));
-    return s.conversations?.['private:984776985']?.agentToken || '';
+    const c = JSON.parse(fs.readFileSync(path.join(BRIDGE_DIR, 'config.json'), 'utf8'));
+    return String(c.ownerQQ || '').trim();
+  } catch { return ''; }
+}
+
+function agentToken() {
+  const qq = ownerQQ();
+  if (!/^\d{5,12}$/.test(qq)) return '';
+  try {
+    const s = JSON.parse(fs.readFileSync(path.join(BRIDGE_DIR, 'state', 'social-v2.json'), 'utf8'));
+    return s.conversations?.['private:' + qq]?.agentToken || '';
   } catch { return ''; }
 }
 
@@ -317,10 +326,7 @@ app.whenReady().then(() => {
       personaName: String(cfg.personaName || '').trim() || 'AI 助手',
       qqNickname: String(cfg.qqNickname || '').trim(),
       botQQ: String(cfg.qq || '').trim(),
-      ownerQQ: (() => {
-        try { return String(JSON.parse(fs.readFileSync(path.join(BRIDGE_DIR, 'config.json'), 'utf8')).ownerQQ || ''); }
-        catch { return ''; }
-      })(),
+      ownerQQ: ownerQQ(),
       // 环境冲突检测：SnowLuma 在跑的话，同一个 QQ 号会被它 hook，NapCat 再 hook 会打架
       snowlumaRunning: (await tcpAlive(3001)) || (await tcpAlive(5099)),
       // NapCat 真需要扫码时（它生成了 qrcode.png 且是新的）才让界面显示二维码
@@ -501,7 +507,7 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('read-diary', () => {
     try {
-      const dir = 'D:\\qq-bridge\\state\\her-diary';
+      const dir = path.join(BRIDGE_DIR, 'state', 'her-diary');
       const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort().slice(-3);
       return files.reverse().map((f) => ({
         date: f.replace(/\.md$/, ''),
@@ -514,7 +520,7 @@ app.whenReady().then(() => {
   ipcMain.handle('backup-her', () => {
     try {
       const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
-      const dir = path.join('D:', 'QQaibot', 'backups');
+      const dir = path.join(BRIDGE_DIR, 'backups');
       fs.mkdirSync(dir, { recursive: true });
       const out = path.join(dir, `her-backup-${ts}.zip`);
       const items = [
@@ -537,8 +543,10 @@ app.whenReady().then(() => {
   });
   ipcMain.handle('read-emotion', () => {
     try {
-      const s = JSON.parse(fs.readFileSync('D:\\qq-bridge\\state\\social-v2.json', 'utf8'));
-      const c = s.conversations?.['private:984776985'];
+      const qq = ownerQQ();
+      if (!/^\d{5,12}$/.test(qq)) return null;
+      const s = JSON.parse(fs.readFileSync(path.join(BRIDGE_DIR, 'state', 'social-v2.json'), 'utf8'));
+      const c = s.conversations?.['private:' + qq];
       const e = c?.emotion || {};
       return { pad: e.pad || [0, 0, 0], updatedAt: e.updatedAt || 0, lastEvent: e.lastEvent || '' };
     } catch { return null; }
